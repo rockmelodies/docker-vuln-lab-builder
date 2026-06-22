@@ -1,0 +1,92 @@
+# =============================================================================
+# Docker 漏洞靶场 docker-compose 模板
+# 使用说明: 根据具体漏洞场景修改以下配置
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # 主应用服务
+  # ---------------------------------------------------------------------------
+  web:
+    # 使用本地构建
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # args:
+      #   - BUILD_ARG=value
+    # 或使用远程镜像
+    # image: rockmelodies/vuln-lab:latest
+    container_name: vuln-lab-web
+    restart: unless-stopped
+    ports:
+      - "8080:80"       # HTTP
+      # - "8443:443"    # HTTPS
+    environment:
+      - APP_ENV=vuln
+      # - DB_HOST=db
+      # - DB_PORT=3306
+      # - DB_USER=root
+      # - DB_PASSWORD=vuln_password
+      # - DB_NAME=vuln_db
+    # volumes:
+    #   - ./src:/app/src
+    #   - ./logs:/app/logs
+    networks:
+      - vuln-network
+    # privileged: false   # 仅在必要时启用
+    # cap_add:
+    #   - NET_ADMIN
+    #   - SYS_PTRACE
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # 数据库服务 (如需要)
+  # ---------------------------------------------------------------------------
+  db:
+    image: mysql:8.0
+    container_name: vuln-lab-db
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=vuln_password
+      - MYSQL_DATABASE=vuln_db
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - vuln-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Redis服务 (如需要)
+  # ---------------------------------------------------------------------------
+  # redis:
+  #   image: redis:7.0-alpine
+  #   container_name: vuln-lab-redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   networks:
+  #     - vuln-network
+
+networks:
+  vuln-network:
+    driver: bridge
+
+volumes:
+  db-data:
